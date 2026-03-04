@@ -15,6 +15,7 @@ margin:0;
 .wrapper{
 display:flex;
 justify-content:center;
+align-items:flex-start;
 margin-top:20px;
 }
 
@@ -36,9 +37,13 @@ margin-left:20px;
 }
 
 canvas{
+width:500px;
+height:500px;
+flex:0 0 auto;
 background:#111;
 border-radius:8px;
 border:2px solid #333;
+cursor:pointer;
 }
 
 .box{
@@ -83,19 +88,11 @@ border-radius:4px;
 <h3>Guide</h3>
 
 Click cells to draw corridor.<br>
-Double click to finish corridor.
+Double click to finish corridor.<br><br>
 
-<br><br>
+Delete corridor from layer list.<br><br>
 
-Delete corridor using layer list.
-
-<br><br>
-
-Press PLAN to test your strategy.
-
-<br><br>
-
-Reach the target to unlock next level.
+Press PLAN to evaluate strategy.
 
 </div>
 
@@ -121,10 +118,7 @@ Reach the target to unlock next level.
 <h3>Corridor Layers</h3>
 <div id="layers"></div>
 
-<h3>Level Target</h3>
-<p id="target"></p>
-
-<h3>Statistics</h3>
+<h3>Stats</h3>
 <p id="stats"></p>
 
 </div>
@@ -135,7 +129,7 @@ Reach the target to unlock next level.
 
 const rows=20
 const cols=20
-const cell=25
+const cellSize=25
 const baseTemp=28
 
 const canvas=document.getElementById("map")
@@ -150,40 +144,30 @@ let current=[]
 let existingLST=0
 let existingUHI=0
 
-let level=0
-
-const levels=[
-{lst:0.8,uhi:0.6,budget:400},
-{lst:1.5,uhi:1.2,budget:350},
-{lst:2.3,uhi:1.8,budget:320}
-]
-
 function getCell(e){
 
 const rect=canvas.getBoundingClientRect()
 
+const scaleX=canvas.width/rect.width
+const scaleY=canvas.height/rect.height
+
+const x=(e.clientX-rect.left)*scaleX
+const y=(e.clientY-rect.top)*scaleY
+
 return{
-r:Math.floor((e.clientY-rect.top)/cell),
-c:Math.floor((e.clientX-rect.left)/cell)
+r:Math.floor(y/cellSize),
+c:Math.floor(x/cellSize)
 }
 
 }
 
-function startLevel(){
-
-corridors=[]
-current=[]
-generateMap()
-updateTarget()
-draw()
-
-}
-
-function generateMap(){
+function initGrid(){
 
 grid=[]
 heatSources=[]
 coldSources=[]
+corridors=[]
+current=[]
 
 for(let r=0;r<rows;r++){
 
@@ -224,6 +208,8 @@ grid[r][c]="urban"
 }
 
 calculateBaseline()
+
+draw()
 
 }
 
@@ -314,16 +300,16 @@ for(let c=0;c<cols;c++){
 let t=cellTemp(r,c)
 
 ctx.fillStyle=getColor(t)
-ctx.fillRect(c*cell,r*cell,cell,cell)
+ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
 
 ctx.strokeStyle="rgba(255,255,255,0.08)"
-ctx.strokeRect(c*cell,r*cell,cell,cell)
+ctx.strokeRect(c*cellSize,r*cellSize,cellSize,cellSize)
 
 if(grid[r][c]=="heat"){
 
 ctx.fillStyle="black"
 ctx.beginPath()
-ctx.arc(c*cell+12,r*cell+12,5,0,6.28)
+ctx.arc(c*cellSize+12,r*cellSize+12,5,0,6.28)
 ctx.fill()
 
 }
@@ -332,7 +318,7 @@ if(grid[r][c]=="cold"){
 
 ctx.fillStyle="#00ff7f"
 ctx.beginPath()
-ctx.arc(c*cell+12,r*cell+12,5,0,6.28)
+ctx.arc(c*cellSize+12,r*cellSize+12,5,0,6.28)
 ctx.fill()
 
 }
@@ -340,7 +326,7 @@ ctx.fill()
 if(grid[r][c]=="restricted"){
 
 ctx.fillStyle="gray"
-ctx.fillRect(c*cell,r*cell,cell,cell)
+ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
 
 }
 
@@ -365,8 +351,8 @@ ctx.beginPath()
 
 line.forEach((p,i)=>{
 
-let x=p.c*cell+12
-let y=p.r*cell+12
+let x=p.c*cellSize+12
+let y=p.r*cellSize+12
 
 if(i==0) ctx.moveTo(x,y)
 else ctx.lineTo(x,y)
@@ -482,71 +468,13 @@ document.getElementById("stats").innerText=
 
 }
 
-function updateTarget(){
-
-let t=levels[level]
-
-document.getElementById("target").innerText=
-
-"LST Reduction ≥ "+t.lst+
-"\nUHI Reduction ≥ "+t.uhi+
-"\nBudget ≤ "+t.budget
-
-}
-
 function evaluatePlan(){
 
-let total=0
-let count=0
-
-for(let r=0;r<rows;r++){
-for(let c=0;c<cols;c++){
-
-total+=cellTemp(r,c)
-count++
-
-}
-}
-
-let newLST=total/count
-let newUHI=newLST-baseTemp
-
-let lstReduction=existingLST-newLST
-let uhiReduction=existingUHI-newUHI
-
-let cost=0
-
-corridors.forEach(c=>{
-cost+=c.length*12
-})
-
-let target=levels[level]
-
-if(lstReduction>=target.lst && uhiReduction>=target.uhi && cost<=target.budget){
-
-alert("Level Completed!")
-
-level++
-
-if(level>=levels.length){
-
-alert("You completed all levels!")
-
-}else{
-
-startLevel()
+alert("Evaluation system can be expanded")
 
 }
 
-}else{
-
-alert("Target not achieved. Re-plan your corridors.")
-
-}
-
-}
-
-startLevel()
+initGrid()
 
 </script>
 
