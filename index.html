@@ -6,8 +6,8 @@
 <style>
 
 body{
-font-family:Arial;
-background:#1b1b1b;
+font-family:Segoe UI,Arial;
+background:#121212;
 color:white;
 margin:0;
 }
@@ -19,47 +19,59 @@ align-items:flex-start;
 margin-top:20px;
 }
 
+.panel{
+background:#1f1f1f;
+padding:15px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.4);
+}
+
 .leftpanel{
 width:220px;
 margin-right:20px;
-text-align:left;
 }
 
 .rightpanel{
-width:240px;
+width:260px;
 margin-left:20px;
-text-align:left;
 }
 
 canvas{
-background:white;
-border:2px solid black;
-cursor:pointer;
-flex-shrink:0;
+background:#111;
+border-radius:8px;
+border:2px solid #333;
 }
 
 .box{
-width:18px;
-height:18px;
+width:16px;
+height:16px;
 display:inline-block;
 margin-right:8px;
 }
 
 button{
-padding:6px 10px;
-margin:3px;
+background:#3a86ff;
+border:none;
+padding:7px 12px;
+margin:4px;
+border-radius:4px;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#5aa0ff;
 }
 
 .layer{
-background:#2b2b2b;
-padding:5px;
-margin-top:5px;
+background:#2a2a2a;
+padding:6px;
+margin-top:4px;
+border-radius:4px;
 }
 
-.guide{
-background:#2b2b2b;
-padding:10px;
-font-size:13px;
+h3{
+margin-top:5px;
 }
 
 </style>
@@ -71,40 +83,22 @@ font-size:13px;
 
 <div class="wrapper">
 
-<div class="leftpanel">
+<div class="panel leftpanel">
 
-<div class="guide">
+<h3>Guide</h3>
 
-<b>GUIDE</b>
-
-<br><br>
-
-<b>Create Corridor</b><br>
-Click cells to draw a corridor path.<br>
-Double-click to finish the corridor.
+Create corridor:<br>
+Click cells to draw path.<br>
+Double-click to finish.
 
 <br><br>
 
-<b>Delete Corridor</b><br>
-Use the Delete button in the corridor list.
+Delete corridor:<br>
+Use Delete button.
 
 <br><br>
 
-<b>Reset</b><br>
-Remove all corridors and start again.
-
-<br><br>
-
-<b>Next Level</b><br>
-Press PLAN to evaluate your strategy.
-
-To pass the level you must:<br>
-
-• Reduce LST<br>
-• Reduce UHI<br>
-• Stay within the budget
-
-</div>
+Press PLAN to test strategy.
 
 </div>
 
@@ -112,18 +106,17 @@ To pass the level you must:<br>
 <canvas id="map" width="500" height="500"></canvas>
 
 
-<div class="rightpanel">
+<div class="panel rightpanel">
 
 <h3>Legend</h3>
 
-<div><span class="box" style="background:red"></span>Very Hot</div>
-<div><span class="box" style="background:orange"></span>Hot</div>
-<div><span class="box" style="background:yellow"></span>Moderate</div>
-<div><span class="box" style="background:lightblue"></span>Cool</div>
+<div><span class="box" style="background:#ff3b3b"></span>Very Hot</div>
+<div><span class="box" style="background:#ff8c00"></span>Hot</div>
+<div><span class="box" style="background:#ffd500"></span>Moderate</div>
+<div><span class="box" style="background:#3ec1ff"></span>Cool</div>
 <div><span class="box" style="background:black"></span>Heat Source</div>
-<div><span class="box" style="background:green"></span>Cold Source</div>
-<div><span class="box" style="background:gray"></span>Restricted Area</div>
-<div><span class="box" style="background:lime"></span>Corridor</div>
+<div><span class="box" style="background:#00ff7f"></span>Cold Source</div>
+<div><span class="box" style="background:gray"></span>Restricted</div>
 
 <br>
 
@@ -133,7 +126,6 @@ To pass the level you must:<br>
 <h3>Corridor Layers</h3>
 <div id="layers"></div>
 
-<p id="challenge"></p>
 <p id="stats"></p>
 
 </div>
@@ -144,7 +136,7 @@ To pass the level you must:<br>
 
 const rows=20
 const cols=20
-const cellSize=25
+const cell=25
 const baseTemp=28
 
 const canvas=document.getElementById("map")
@@ -156,18 +148,7 @@ let coldSources=[]
 let restricted=[]
 
 let corridors=[]
-let currentCorridor=[]
-
-let existingLST=0
-let existingUHI=0
-
-let level=1
-
-const levels=[
-{lstReduction:0.8,uhiReduction:0.6,budget:400},
-{lstReduction:1.5,uhiReduction:1.2,budget:350},
-{lstReduction:2.5,uhiReduction:2.0,budget:320}
-]
+let current=[]
 
 function getCell(e){
 
@@ -176,10 +157,10 @@ const rect=canvas.getBoundingClientRect()
 const x=e.clientX-rect.left
 const y=e.clientY-rect.top
 
-const c=Math.floor(x/cellSize)
-const r=Math.floor(y/cellSize)
-
-return {r,c}
+return{
+r:Math.floor(y/cell),
+c:Math.floor(x/cell)
+}
 
 }
 
@@ -190,7 +171,7 @@ heatSources=[]
 coldSources=[]
 restricted=[]
 corridors=[]
-currentCorridor=[]
+current=[]
 
 for(let r=0;r<rows;r++){
 
@@ -230,45 +211,16 @@ grid[r][c]="urban"
 
 }
 
-existingLST=calculateAverageTemp()
-existingUHI=existingLST-baseTemp
-
-updateChallenge()
-updateLayers()
+draw()
 
 }
 
-function updateChallenge(){
+function tempColor(t){
 
-let ch=levels[level-1]
-
-document.getElementById("challenge").innerText=
-
-"LEVEL "+level+
-"\nReduce LST ≥ "+ch.lstReduction+
-"\nReduce UHI ≥ "+ch.uhiReduction+
-"\nBudget ≤ "+ch.budget
-
-}
-
-function corridorCooling(r,c){
-
-let cool=0
-
-corridors.forEach(line=>{
-
-line.forEach(cell=>{
-
-let d=Math.sqrt((cell.r-r)**2+(cell.c-c)**2)
-
-if(d<2) cool+=0.8
-else if(d<3) cool+=0.3
-
-})
-
-})
-
-return cool
+if(t>34) return "#ff3b3b"
+if(t>32) return "#ff8c00"
+if(t>30) return "#ffd500"
+return "#3ec1ff"
 
 }
 
@@ -277,40 +229,26 @@ function cellTemp(r,c){
 let t=baseTemp
 
 heatSources.forEach(h=>{
+
 let d=Math.sqrt((h.r-r)**2+(h.c-c)**2)
 t+=6/(d+1)
+
 })
 
 coldSources.forEach(cl=>{
+
 let d=Math.sqrt((cl.r-r)**2+(cl.c-c)**2)
 t-=5/(d+1)
-})
 
-t-=corridorCooling(r,c)
+})
 
 return t
 
 }
 
-function calculateAverageTemp(){
-
-let total=0
-let count=0
-
-for(let r=0;r<rows;r++){
-for(let c=0;c<cols;c++){
-
-total+=cellTemp(r,c)
-count++
-
-}
-}
-
-return total/count
-
-}
-
 function draw(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
 
 for(let r=0;r<rows;r++){
 
@@ -318,35 +256,34 @@ for(let c=0;c<cols;c++){
 
 let t=cellTemp(r,c)
 
-let color
+ctx.fillStyle=tempColor(t)
+ctx.fillRect(c*cell,r*cell,cell,cell)
 
-if(t>34) color="red"
-else if(t>32) color="orange"
-else if(t>30) color="yellow"
-else color="lightblue"
-
-ctx.fillStyle=color
-ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
-ctx.strokeRect(c*cellSize,r*cellSize,cellSize,cellSize)
+ctx.strokeStyle="rgba(255,255,255,0.08)"
+ctx.strokeRect(c*cell,r*cell,cell,cell)
 
 if(grid[r][c]=="heat"){
 
 ctx.fillStyle="black"
-ctx.fillRect(c*cellSize+8,r*cellSize+8,10,10)
+ctx.beginPath()
+ctx.arc(c*cell+12,r*cell+12,5,0,6.28)
+ctx.fill()
 
 }
 
 if(grid[r][c]=="cold"){
 
-ctx.fillStyle="green"
-ctx.fillRect(c*cellSize+8,r*cellSize+8,10,10)
+ctx.fillStyle="#00ff7f"
+ctx.beginPath()
+ctx.arc(c*cell+12,r*cell+12,5,0,6.28)
+ctx.fill()
 
 }
 
 if(grid[r][c]=="restricted"){
 
 ctx.fillStyle="gray"
-ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
+ctx.fillRect(c*cell,r*cell,cell,cell)
 
 }
 
@@ -354,21 +291,33 @@ ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
 
 }
 
-ctx.fillStyle="lime"
+drawCorridors()
+
+}
+
+function drawCorridors(){
+
+ctx.lineWidth=4
+ctx.lineCap="round"
 
 corridors.forEach(line=>{
-line.forEach(cell=>{
-ctx.fillRect(cell.c*cellSize,cell.r*cellSize,cellSize,cellSize)
-})
+
+ctx.beginPath()
+
+line.forEach((p,i)=>{
+
+let x=p.c*cell+12
+let y=p.r*cell+12
+
+if(i==0) ctx.moveTo(x,y)
+else ctx.lineTo(x,y)
+
 })
 
-ctx.fillStyle="cyan"
+ctx.strokeStyle="#00ff7f"
+ctx.stroke()
 
-currentCorridor.forEach(cell=>{
-ctx.fillRect(cell.c*cellSize,cell.r*cellSize,cellSize,cellSize)
 })
-
-updateStats()
 
 }
 
@@ -378,51 +327,64 @@ let {r,c}=getCell(e)
 
 if(grid[r][c]=="restricted") return
 
-currentCorridor.push({r,c})
+current.push({r,c})
 
 draw()
+
+ctx.beginPath()
+
+current.forEach((p,i)=>{
+
+let x=p.c*cell+12
+let y=p.r*cell+12
+
+if(i==0) ctx.moveTo(x,y)
+else ctx.lineTo(x,y)
+
+})
+
+ctx.strokeStyle="#00ffff"
+ctx.lineWidth=3
+ctx.stroke()
 
 })
 
 canvas.addEventListener("dblclick",function(){
 
-if(currentCorridor.length<2){
+if(current.length<2){
 
-currentCorridor=[]
+current=[]
 draw()
 return
 
 }
 
-if(confirm("Finish this corridor?")){
+if(confirm("Finish corridor?")){
 
-corridors.push([...currentCorridor])
+corridors.push([...current])
 
 }
 
-currentCorridor=[]
-
-updateLayers()
+current=[]
 
 draw()
+updateLayers()
 
 })
 
 function updateLayers(){
 
-let panel=document.getElementById("layers")
-
-panel.innerHTML=""
+let div=document.getElementById("layers")
+div.innerHTML=""
 
 corridors.forEach((c,i)=>{
 
-let div=document.createElement("div")
-div.className="layer"
+let d=document.createElement("div")
+d.className="layer"
 
-div.innerHTML="Corridor "+(i+1)+
-" <button onclick='deleteCorridor("+i+")'>Delete</button>"
+d.innerHTML="Corridor "+(i+1)+" <button onclick='deleteCorridor("+i+")'>Delete</button>"
 
-panel.appendChild(div)
+div.appendChild(d)
 
 })
 
@@ -431,7 +393,6 @@ panel.appendChild(div)
 function deleteCorridor(i){
 
 corridors.splice(i,1)
-
 updateLayers()
 draw()
 
@@ -440,90 +401,19 @@ draw()
 function resetCorridors(){
 
 corridors=[]
-currentCorridor=[]
+current=[]
 updateLayers()
 draw()
 
 }
 
-function updateStats(){
-
-let newLST=calculateAverageTemp()
-let newUHI=newLST-baseTemp
-
-let totalCells=0
-
-corridors.forEach(line=>{
-totalCells+=line.length
-})
-
-let cost=totalCells*12
-
-document.getElementById("stats").innerText=
-
-"Existing LST: "+existingLST.toFixed(2)+"\n"+
-"New LST: "+newLST.toFixed(2)+"\n"+
-"LST Reduction: "+(existingLST-newLST).toFixed(2)+"\n\n"+
-
-"Existing UHI: "+existingUHI.toFixed(2)+"\n"+
-"New UHI: "+newUHI.toFixed(2)+"\n"+
-"UHI Reduction: "+(existingUHI-newUHI).toFixed(2)+"\n\n"+
-
-"Cost: "+cost
-
-}
-
 function evaluatePlan(){
 
-let newLST=calculateAverageTemp()
-let newUHI=newLST-baseTemp
-
-let lstReduction=existingLST-newLST
-let uhiReduction=existingUHI-newUHI
-
-let totalCells=0
-
-corridors.forEach(line=>{
-totalCells+=line.length
-})
-
-let cost=totalCells*12
-
-let ch=levels[level-1]
-
-if(cost>ch.budget){
-
-alert("Budget exceeded")
-return
-
-}
-
-if(lstReduction<ch.lstReduction || uhiReduction<ch.uhiReduction){
-
-alert("Cooling impact insufficient")
-return
-
-}
-
-alert("Level Completed!")
-
-level++
-
-if(level>levels.length){
-
-alert("All levels completed!")
-
-}else{
-
-initGrid()
-draw()
-
-}
+alert("Plan evaluation coming next stage")
 
 }
 
 initGrid()
-draw()
 
 </script>
 
