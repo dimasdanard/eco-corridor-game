@@ -40,6 +40,7 @@ canvas{
 background:#111;
 border-radius:8px;
 border:2px solid #333;
+cursor:pointer;
 }
 
 .box{
@@ -70,10 +71,6 @@ margin-top:4px;
 border-radius:4px;
 }
 
-h3{
-margin-top:5px;
-}
-
 </style>
 </head>
 
@@ -89,7 +86,7 @@ margin-top:5px;
 
 Create corridor:<br>
 Click cells to draw path.<br>
-Double-click to finish.
+Double click to finish.
 
 <br><br>
 
@@ -98,13 +95,15 @@ Use Delete button.
 
 <br><br>
 
-Press PLAN to test strategy.
+Reset removes all corridors.
+
+<br><br>
+
+Press PLAN to evaluate strategy.
 
 </div>
 
-
 <canvas id="map" width="500" height="500"></canvas>
-
 
 <div class="panel rightpanel">
 
@@ -149,6 +148,9 @@ let restricted=[]
 
 let corridors=[]
 let current=[]
+
+let existingLST=0
+let existingUHI=0
 
 function getCell(e){
 
@@ -211,16 +213,66 @@ grid[r][c]="urban"
 
 }
 
+calculateBaseline()
+
 draw()
 
 }
 
-function tempColor(t){
+function calculateBaseline(){
 
-if(t>34) return "#ff3b3b"
-if(t>32) return "#ff8c00"
-if(t>30) return "#ffd500"
-return "#3ec1ff"
+let total=0
+let count=0
+
+for(let r=0;r<rows;r++){
+for(let c=0;c<cols;c++){
+
+total+=cellTemp(r,c)
+count++
+
+}
+}
+
+existingLST=total/count
+existingUHI=existingLST-baseTemp
+
+}
+
+function getColor(t){
+
+let min=28
+let max=36
+
+let ratio=(t-min)/(max-min)
+
+ratio=Math.max(0,Math.min(1,ratio))
+
+let r=Math.floor(255*ratio)
+let g=Math.floor(200*(1-ratio))
+let b=Math.floor(255*(1-ratio))
+
+return "rgb("+r+","+g+","+b+")"
+
+}
+
+function corridorCooling(r,c){
+
+let cool=0
+
+corridors.forEach(line=>{
+
+line.forEach(cell=>{
+
+let d=Math.sqrt((cell.r-r)**2+(cell.c-c)**2)
+
+if(d<2) cool+=0.8
+else if(d<3) cool+=0.3
+
+})
+
+})
+
+return cool
 
 }
 
@@ -229,18 +281,16 @@ function cellTemp(r,c){
 let t=baseTemp
 
 heatSources.forEach(h=>{
-
 let d=Math.sqrt((h.r-r)**2+(h.c-c)**2)
 t+=6/(d+1)
-
 })
 
 coldSources.forEach(cl=>{
-
 let d=Math.sqrt((cl.r-r)**2+(cl.c-c)**2)
 t-=5/(d+1)
-
 })
+
+t-=corridorCooling(r,c)
 
 return t
 
@@ -256,7 +306,7 @@ for(let c=0;c<cols;c++){
 
 let t=cellTemp(r,c)
 
-ctx.fillStyle=tempColor(t)
+ctx.fillStyle=getColor(t)
 ctx.fillRect(c*cell,r*cell,cell,cell)
 
 ctx.strokeStyle="rgba(255,255,255,0.08)"
@@ -292,6 +342,8 @@ ctx.fillRect(c*cell,r*cell,cell,cell)
 }
 
 drawCorridors()
+
+updateStats()
 
 }
 
@@ -407,9 +459,44 @@ draw()
 
 }
 
+function updateStats(){
+
+let total=0
+let count=0
+
+for(let r=0;r<rows;r++){
+for(let c=0;c<cols;c++){
+
+total+=cellTemp(r,c)
+count++
+
+}
+}
+
+let newLST=total/count
+let newUHI=newLST-baseTemp
+
+let cost=0
+
+corridors.forEach(c=>{
+cost+=c.length*12
+})
+
+document.getElementById("stats").innerText=
+
+"Existing LST: "+existingLST.toFixed(2)+
+"\nNew LST: "+newLST.toFixed(2)+
+"\nLST Reduction: "+(existingLST-newLST).toFixed(2)+
+"\n\nExisting UHI: "+existingUHI.toFixed(2)+
+"\nNew UHI: "+newUHI.toFixed(2)+
+"\nUHI Reduction: "+(existingUHI-newUHI).toFixed(2)+
+"\n\nCost: "+cost
+
+}
+
 function evaluatePlan(){
 
-alert("Plan evaluation coming next stage")
+alert("Evaluation system can be expanded here")
 
 }
 
