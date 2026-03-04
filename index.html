@@ -15,7 +15,6 @@ margin:0;
 .wrapper{
 display:flex;
 justify-content:center;
-align-items:flex-start;
 margin-top:20px;
 }
 
@@ -32,7 +31,7 @@ margin-right:20px;
 }
 
 .rightpanel{
-width:260px;
+width:280px;
 margin-left:20px;
 }
 
@@ -46,11 +45,23 @@ border:2px solid #333;
 cursor:pointer;
 }
 
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+}
+
+td,th{
+border:1px solid #444;
+padding:4px;
+text-align:center;
+}
+
 .box{
-width:16px;
-height:16px;
+width:14px;
+height:14px;
 display:inline-block;
-margin-right:8px;
+margin-right:6px;
 }
 
 button{
@@ -87,12 +98,17 @@ border-radius:4px;
 
 <h3>Guide</h3>
 
-Click cells to draw corridor.<br>
-Double click to finish corridor.<br><br>
+Click map to draw corridor.<br>
+Corridor appears instantly.<br>
+Double click to finish corridor.
 
-Delete corridor from layer list.<br><br>
+<br><br>
 
-Press PLAN to evaluate strategy.
+Delete corridor from layer list.
+
+<br><br>
+
+Meet planning targets to unlock next level.
 
 </div>
 
@@ -108,7 +124,8 @@ Press PLAN to evaluate strategy.
 <div><span class="box" style="background:#3ec1ff"></span>Cool</div>
 <div><span class="box" style="background:black"></span>Heat Source</div>
 <div><span class="box" style="background:#00ff7f"></span>Cold Source</div>
-<div><span class="box" style="background:gray"></span>Restricted</div>
+<div><span class="box" style="background:#777"></span>Restricted Area</div>
+<div><span class="box" style="background:#00ff9c"></span>Ecological Corridor</div>
 
 <br>
 
@@ -118,8 +135,35 @@ Press PLAN to evaluate strategy.
 <h3>Corridor Layers</h3>
 <div id="layers"></div>
 
-<h3>Stats</h3>
-<p id="stats"></p>
+<h3>Target vs Scenario</h3>
+
+<table>
+
+<tr>
+<th>Indicator</th>
+<th>Target</th>
+<th>Scenario</th>
+</tr>
+
+<tr>
+<td>LST Reduction</td>
+<td id="t_lst"></td>
+<td id="s_lst"></td>
+</tr>
+
+<tr>
+<td>UHI Reduction</td>
+<td id="t_uhi"></td>
+<td id="s_uhi"></td>
+</tr>
+
+<tr>
+<td>Budget</td>
+<td id="t_budget"></td>
+<td id="s_budget"></td>
+</tr>
+
+</table>
 
 </div>
 
@@ -129,7 +173,7 @@ Press PLAN to evaluate strategy.
 
 const rows=20
 const cols=20
-const cellSize=25
+const cell=25
 const baseTemp=28
 
 const canvas=document.getElementById("map")
@@ -144,30 +188,41 @@ let current=[]
 let existingLST=0
 let existingUHI=0
 
+let level=0
+
+const levels=[
+{lst:0.8,uhi:0.6,budget:400},
+{lst:1.5,uhi:1.2,budget:350},
+{lst:2.2,uhi:1.8,budget:320}
+]
+
 function getCell(e){
 
 const rect=canvas.getBoundingClientRect()
 
-const scaleX=canvas.width/rect.width
-const scaleY=canvas.height/rect.height
-
-const x=(e.clientX-rect.left)*scaleX
-const y=(e.clientY-rect.top)*scaleY
-
 return{
-r:Math.floor(y/cellSize),
-c:Math.floor(x/cellSize)
+r:Math.floor((e.clientY-rect.top)/cell),
+c:Math.floor((e.clientX-rect.left)/cell)
 }
 
 }
 
-function initGrid(){
+function startLevel(){
+
+corridors=[]
+current=[]
+
+generateMap()
+updateTargets()
+draw()
+
+}
+
+function generateMap(){
 
 grid=[]
 heatSources=[]
 coldSources=[]
-corridors=[]
-current=[]
 
 for(let r=0;r<rows;r++){
 
@@ -209,8 +264,6 @@ grid[r][c]="urban"
 
 calculateBaseline()
 
-draw()
-
 }
 
 function calculateBaseline(){
@@ -232,43 +285,6 @@ existingUHI=existingLST-baseTemp
 
 }
 
-function getColor(t){
-
-let min=28
-let max=36
-
-let ratio=(t-min)/(max-min)
-ratio=Math.max(0,Math.min(1,ratio))
-
-let r=Math.floor(255*ratio)
-let g=Math.floor(200*(1-ratio))
-let b=Math.floor(255*(1-ratio))
-
-return "rgb("+r+","+g+","+b+")"
-
-}
-
-function corridorCooling(r,c){
-
-let cool=0
-
-corridors.forEach(line=>{
-
-line.forEach(cell=>{
-
-let d=Math.sqrt((cell.r-r)**2+(cell.c-c)**2)
-
-if(d<2) cool+=0.8
-else if(d<3) cool+=0.3
-
-})
-
-})
-
-return cool
-
-}
-
 function cellTemp(r,c){
 
 let t=baseTemp
@@ -283,9 +299,29 @@ let d=Math.sqrt((cl.r-r)**2+(cl.c-c)**2)
 t-=5/(d+1)
 })
 
-t-=corridorCooling(r,c)
+corridors.forEach(line=>{
+
+line.forEach(p=>{
+
+let d=Math.sqrt((p.r-r)**2+(p.c-c)**2)
+
+if(d<2)t-=0.8
+else if(d<3)t-=0.3
+
+})
+
+})
 
 return t
+
+}
+
+function getColor(t){
+
+if(t>34) return "#ff3b3b"
+if(t>32) return "#ff8c00"
+if(t>30) return "#ffd500"
+return "#3ec1ff"
 
 }
 
@@ -294,22 +330,28 @@ function draw(){
 ctx.clearRect(0,0,canvas.width,canvas.height)
 
 for(let r=0;r<rows;r++){
-
 for(let c=0;c<cols;c++){
 
 let t=cellTemp(r,c)
 
 ctx.fillStyle=getColor(t)
-ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
+ctx.fillRect(c*cell,r*cell,cell,cell)
 
 ctx.strokeStyle="rgba(255,255,255,0.08)"
-ctx.strokeRect(c*cellSize,r*cellSize,cellSize,cellSize)
+ctx.strokeRect(c*cell,r*cell,cell,cell)
+
+if(grid[r][c]=="restricted"){
+
+ctx.fillStyle="#777"
+ctx.fillRect(c*cell,r*cell,cell,cell)
+
+}
 
 if(grid[r][c]=="heat"){
 
 ctx.fillStyle="black"
 ctx.beginPath()
-ctx.arc(c*cellSize+12,r*cellSize+12,5,0,6.28)
+ctx.arc(c*cell+12,r*cell+12,5,0,6.28)
 ctx.fill()
 
 }
@@ -318,25 +360,16 @@ if(grid[r][c]=="cold"){
 
 ctx.fillStyle="#00ff7f"
 ctx.beginPath()
-ctx.arc(c*cellSize+12,r*cellSize+12,5,0,6.28)
+ctx.arc(c*cell+12,r*cell+12,5,0,6.28)
 ctx.fill()
 
 }
 
-if(grid[r][c]=="restricted"){
-
-ctx.fillStyle="gray"
-ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
-
 }
-
-}
-
 }
 
 drawCorridors()
-
-updateStats()
+updateScenario()
 
 }
 
@@ -351,18 +384,37 @@ ctx.beginPath()
 
 line.forEach((p,i)=>{
 
-let x=p.c*cellSize+12
-let y=p.r*cellSize+12
+let x=p.c*cell+12
+let y=p.r*cell+12
 
 if(i==0) ctx.moveTo(x,y)
 else ctx.lineTo(x,y)
 
 })
 
-ctx.strokeStyle="#00ff7f"
+ctx.strokeStyle="#00ff9c"
 ctx.stroke()
 
 })
+
+if(current.length>1){
+
+ctx.beginPath()
+
+current.forEach((p,i)=>{
+
+let x=p.c*cell+12
+let y=p.r*cell+12
+
+if(i==0) ctx.moveTo(x,y)
+else ctx.lineTo(x,y)
+
+})
+
+ctx.strokeStyle="#00ffff"
+ctx.stroke()
+
+}
 
 }
 
@@ -380,18 +432,16 @@ draw()
 
 canvas.addEventListener("dblclick",function(){
 
-if(current.length<2){
+if(current.length>1){
 
-current=[]
-draw()
-return
+corridors.push([...current])
+
+updateLayers()
 
 }
 
-corridors.push([...current])
 current=[]
 
-updateLayers()
 draw()
 
 })
@@ -431,7 +481,17 @@ draw()
 
 }
 
-function updateStats(){
+function updateTargets(){
+
+let t=levels[level]
+
+document.getElementById("t_lst").innerText=t.lst
+document.getElementById("t_uhi").innerText=t.uhi
+document.getElementById("t_budget").innerText="≤ "+t.budget
+
+}
+
+function updateScenario(){
 
 let total=0
 let count=0
@@ -454,27 +514,45 @@ corridors.forEach(c=>{
 cost+=c.length*12
 })
 
-document.getElementById("stats").innerText=
-
-"Existing LST: "+existingLST.toFixed(2)+
-"\nNew LST: "+newLST.toFixed(2)+
-"\nLST Reduction: "+(existingLST-newLST).toFixed(2)+
-
-"\n\nExisting UHI: "+existingUHI.toFixed(2)+
-"\nNew UHI: "+newUHI.toFixed(2)+
-"\nUHI Reduction: "+(existingUHI-newUHI).toFixed(2)+
-
-"\n\nCost: "+cost
+document.getElementById("s_lst").innerText=(existingLST-newLST).toFixed(2)
+document.getElementById("s_uhi").innerText=(existingUHI-newUHI).toFixed(2)
+document.getElementById("s_budget").innerText=cost
 
 }
 
 function evaluatePlan(){
 
-alert("Evaluation system can be expanded")
+let lst=parseFloat(document.getElementById("s_lst").innerText)
+let uhi=parseFloat(document.getElementById("s_uhi").innerText)
+let cost=parseFloat(document.getElementById("s_budget").innerText)
+
+let t=levels[level]
+
+if(lst>=t.lst && uhi>=t.uhi && cost<=t.budget){
+
+alert("LEVEL COMPLETED")
+
+level++
+
+if(level>=levels.length){
+
+alert("You completed all levels!")
+
+}else{
+
+startLevel()
 
 }
 
-initGrid()
+}else{
+
+alert("Target not achieved. Revise your plan.")
+
+}
+
+}
+
+startLevel()
 
 </script>
 
