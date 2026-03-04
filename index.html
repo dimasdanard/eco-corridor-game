@@ -1,20 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Urban Ecological Corridor Challenge</title>
 
 <style>
 
+/* GENERAL */
+
 body{
-font-family:Segoe UI;
+font-family:Segoe UI,Arial;
 background:#121212;
 color:white;
 margin:0;
+text-align:center;
 }
+
+/* LAYOUT */
 
 .wrapper{
 display:flex;
 justify-content:center;
+align-items:flex-start;
+gap:20px;
+flex-wrap:wrap;
 margin-top:20px;
 }
 
@@ -25,25 +36,49 @@ border-radius:8px;
 box-shadow:0 0 10px rgba(0,0,0,0.5);
 }
 
-.leftpanel{
-width:220px;
-margin-right:20px;
+.leftpanel,.rightpanel{
+width:260px;
+text-align:left;
 }
 
-.rightpanel{
-width:280px;
-margin-left:20px;
-}
+/* MAP */
 
 canvas{
-width:500px;
-height:500px;
-flex:0 0 auto;
+width:90vw;
+max-width:500px;
+aspect-ratio:1/1;
 background:#111;
 border-radius:8px;
 border:2px solid #333;
 cursor:pointer;
 }
+
+/* LEGEND */
+
+.box{
+width:14px;
+height:14px;
+display:inline-block;
+margin-right:6px;
+}
+
+/* BUTTON */
+
+button{
+background:#3a86ff;
+border:none;
+padding:8px 12px;
+margin:5px;
+border-radius:5px;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#5aa0ff;
+}
+
+/* TABLE */
 
 table{
 width:100%;
@@ -53,30 +88,11 @@ margin-top:10px;
 
 td,th{
 border:1px solid #444;
-padding:4px;
+padding:5px;
 text-align:center;
 }
 
-.box{
-width:14px;
-height:14px;
-display:inline-block;
-margin-right:6px;
-}
-
-button{
-background:#3a86ff;
-border:none;
-padding:7px 12px;
-margin:4px;
-border-radius:4px;
-color:white;
-cursor:pointer;
-}
-
-button:hover{
-background:#5aa0ff;
-}
+/* LAYERS */
 
 .layer{
 background:#2a2a2a;
@@ -85,12 +101,27 @@ margin-top:4px;
 border-radius:4px;
 }
 
+/* MOBILE */
+
+@media (max-width:800px){
+
+.wrapper{
+flex-direction:column;
+align-items:center;
+}
+
+.leftpanel,.rightpanel{
+width:90%;
+}
+
+}
+
 </style>
 </head>
 
 <body>
 
-<h2 style="text-align:center">Urban Ecological Corridor Challenge</h2>
+<h2>Urban Ecological Corridor Challenge</h2>
 
 <div class="wrapper">
 
@@ -99,8 +130,8 @@ border-radius:4px;
 <h3>Guide</h3>
 
 Click map to draw corridor.<br>
-Corridor appears instantly.<br>
-Double click to finish corridor.
+Corridor appears immediately.<br>
+Double click to finish drawing.
 
 <br><br>
 
@@ -112,7 +143,9 @@ Meet planning targets to unlock next level.
 
 </div>
 
+
 <canvas id="map" width="500" height="500"></canvas>
+
 
 <div class="panel rightpanel">
 
@@ -125,7 +158,7 @@ Meet planning targets to unlock next level.
 <div><span class="box" style="background:black"></span>Heat Source</div>
 <div><span class="box" style="background:#00ff7f"></span>Cold Source</div>
 <div><span class="box" style="background:#777"></span>Restricted Area</div>
-<div><span class="box" style="background:#00ff9c"></span>Ecological Corridor</div>
+<div><span class="box" style="background:#00ff9c"></span>Corridor</div>
 
 <br>
 
@@ -171,6 +204,8 @@ Meet planning targets to unlock next level.
 
 <script>
 
+/* GRID SETTINGS */
+
 const rows=20
 const cols=20
 const cell=25
@@ -190,22 +225,34 @@ let existingUHI=0
 
 let level=0
 
+/* LEVEL TARGETS */
+
 const levels=[
 {lst:0.8,uhi:0.6,budget:400},
 {lst:1.5,uhi:1.2,budget:350},
 {lst:2.2,uhi:1.8,budget:320}
 ]
 
+/* RESPONSIVE CLICK */
+
 function getCell(e){
 
 const rect=canvas.getBoundingClientRect()
 
+const scaleX=canvas.width/rect.width
+const scaleY=canvas.height/rect.height
+
+const x=(e.clientX-rect.left)*scaleX
+const y=(e.clientY-rect.top)*scaleY
+
 return{
-r:Math.floor((e.clientY-rect.top)/cell),
-c:Math.floor((e.clientX-rect.left)/cell)
+r:Math.floor(y/cell),
+c:Math.floor(x/cell)
 }
 
 }
+
+/* START LEVEL */
 
 function startLevel(){
 
@@ -217,6 +264,8 @@ updateTargets()
 draw()
 
 }
+
+/* GENERATE MAP */
 
 function generateMap(){
 
@@ -233,29 +282,21 @@ for(let c=0;c<cols;c++){
 let rand=Math.random()
 
 if(rand<0.05){
-
 grid[r][c]="heat"
 heatSources.push({r,c})
-
 }
 
 else if(rand<0.1){
-
 grid[r][c]="cold"
 coldSources.push({r,c})
-
 }
 
 else if(rand<0.18){
-
 grid[r][c]="restricted"
-
 }
 
 else{
-
 grid[r][c]="urban"
-
 }
 
 }
@@ -265,6 +306,8 @@ grid[r][c]="urban"
 calculateBaseline()
 
 }
+
+/* BASELINE */
 
 function calculateBaseline(){
 
@@ -285,6 +328,8 @@ existingUHI=existingLST-baseTemp
 
 }
 
+/* TEMPERATURE MODEL */
+
 function cellTemp(r,c){
 
 let t=baseTemp
@@ -300,21 +345,19 @@ t-=5/(d+1)
 })
 
 corridors.forEach(line=>{
-
 line.forEach(p=>{
-
 let d=Math.sqrt((p.r-r)**2+(p.c-c)**2)
 
 if(d<2)t-=0.8
 else if(d<3)t-=0.3
-
 })
-
 })
 
 return t
 
 }
+
+/* COLOR SCALE */
 
 function getColor(t){
 
@@ -324,6 +367,8 @@ if(t>30) return "#ffd500"
 return "#3ec1ff"
 
 }
+
+/* DRAW MAP */
 
 function draw(){
 
@@ -373,6 +418,8 @@ updateScenario()
 
 }
 
+/* DRAW CORRIDOR */
+
 function drawCorridors(){
 
 ctx.lineWidth=4
@@ -418,6 +465,8 @@ ctx.stroke()
 
 }
 
+/* CLICK DRAW */
+
 canvas.addEventListener("click",function(e){
 
 let {r,c}=getCell(e)
@@ -430,21 +479,23 @@ draw()
 
 })
 
+/* DOUBLE CLICK FINISH */
+
 canvas.addEventListener("dblclick",function(){
 
 if(current.length>1){
 
 corridors.push([...current])
-
 updateLayers()
 
 }
 
 current=[]
-
 draw()
 
 })
+
+/* LAYER PANEL */
 
 function updateLayers(){
 
@@ -472,6 +523,8 @@ draw()
 
 }
 
+/* RESET */
+
 function resetCorridors(){
 
 corridors=[]
@@ -480,6 +533,8 @@ updateLayers()
 draw()
 
 }
+
+/* TARGET TABLE */
 
 function updateTargets(){
 
@@ -490,6 +545,8 @@ document.getElementById("t_uhi").innerText=t.uhi
 document.getElementById("t_budget").innerText="≤ "+t.budget
 
 }
+
+/* SCENARIO */
 
 function updateScenario(){
 
@@ -519,6 +576,8 @@ document.getElementById("s_uhi").innerText=(existingUHI-newUHI).toFixed(2)
 document.getElementById("s_budget").innerText=cost
 
 }
+
+/* PLAN */
 
 function evaluatePlan(){
 
