@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>UHI Corridor Simulator</title>
+<title>UHI Ecological Corridor Simulator</title>
 
 <style>
 
@@ -15,6 +15,18 @@ color:white;
 canvas{
 background:white;
 border:2px solid black;
+margin-top:10px;
+}
+
+#legend{
+margin-top:10px;
+}
+
+.box{
+display:inline-block;
+width:20px;
+height:20px;
+margin-right:5px;
 }
 
 </style>
@@ -24,11 +36,25 @@ border:2px solid black;
 <body>
 
 <h2>Urban Heat Island Corridor Simulator</h2>
-<p>Klik grid untuk membuat ecological corridor</p>
+<p>Klik lalu tarik untuk membuat ecological corridor</p>
 
 <canvas id="map"></canvas>
 
 <p id="stats"></p>
+
+<div id="legend">
+
+<h3>Legenda</h3>
+
+<div><span class="box" style="background:red"></span> Sangat Panas</div>
+<div><span class="box" style="background:orange"></span> Panas</div>
+<div><span class="box" style="background:yellow"></span> Sedang</div>
+<div><span class="box" style="background:lightblue"></span> Dingin</div>
+<div><span class="box" style="background:black"></span> Heat Source</div>
+<div><span class="box" style="background:green"></span> Cold Source</div>
+<div><span class="box" style="background:lime"></span> Ecological Corridor</div>
+
+</div>
 
 <script>
 
@@ -45,9 +71,11 @@ canvas.width = cols*size
 canvas.height = rows*size
 
 let grid=[]
-let corridor=[]
 let heatSources=[]
 let coldSources=[]
+let corridors=[]
+
+let startCell=null
 
 function initGrid(){
 
@@ -91,6 +119,23 @@ return Math.sqrt((a.r-b.r)**2+(a.c-b.c)**2)
 
 }
 
+function corridorCooling(r,c){
+
+let cooling=0
+
+corridors.forEach(cell=>{
+
+let d=distance(cell,{r,c})
+
+if(d<2) cooling+=0.8
+else if(d<3) cooling+=0.3
+
+})
+
+return cooling
+
+}
+
 function cellTemperature(r,c){
 
 let temp=baseTemp
@@ -109,12 +154,7 @@ temp-=5/(d+1)
 
 })
 
-corridor.forEach(cr=>{
-
-if(cr.r==r && cr.c==c)
-temp-=0.5
-
-})
+temp -= corridorCooling(r,c)
 
 return temp
 
@@ -142,14 +182,14 @@ ctx.strokeRect(c*size,r*size,size,size)
 if(grid[r][c]=="heat"){
 
 ctx.fillStyle="black"
-ctx.fillRect(c*size+8,r*size+8,8,8)
+ctx.fillRect(c*size+8,r*size+8,10,10)
 
 }
 
 if(grid[r][c]=="cold"){
 
 ctx.fillStyle="green"
-ctx.fillRect(c*size+8,r*size+8,8,8)
+ctx.fillRect(c*size+8,r*size+8,10,10)
 
 }
 
@@ -159,7 +199,7 @@ ctx.fillRect(c*size+8,r*size+8,8,8)
 
 ctx.fillStyle="lime"
 
-corridor.forEach(p=>{
+corridors.forEach(p=>{
 
 ctx.fillRect(p.c*size,p.r*size,size,size)
 
@@ -169,14 +209,59 @@ updateStats()
 
 }
 
-canvas.addEventListener("click",function(e){
+function lineCells(a,b){
+
+let cells=[]
+
+let dx=b.c-a.c
+let dy=b.r-a.r
+
+let steps=Math.max(Math.abs(dx),Math.abs(dy))
+
+for(let i=0;i<=steps;i++){
+
+let r=Math.round(a.r + dy*i/steps)
+let c=Math.round(a.c + dx*i/steps)
+
+cells.push({r,c})
+
+}
+
+return cells
+
+}
+
+canvas.addEventListener("mousedown",function(e){
 
 let rect=canvas.getBoundingClientRect()
 
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
-corridor.push({r,c})
+startCell={r,c}
+
+})
+
+canvas.addEventListener("mouseup",function(e){
+
+if(!startCell) return
+
+let rect=canvas.getBoundingClientRect()
+
+let c=Math.floor((e.clientX-rect.left)/size)
+let r=Math.floor((e.clientY-rect.top)/size)
+
+let endCell={r,c}
+
+let line=lineCells(startCell,endCell)
+
+line.forEach(cell=>{
+
+corridors.push(cell)
+
+})
+
+startCell=null
 
 draw()
 
@@ -202,7 +287,7 @@ let avg=(totalTemp/count)
 
 let uhi=avg-baseTemp
 
-let cost=corridor.length*10
+let cost=corridors.length*12
 
 document.getElementById("stats").innerText=
 
