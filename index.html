@@ -36,7 +36,6 @@ margin-right:5px;
 }
 
 </style>
-
 </head>
 
 <body>
@@ -45,7 +44,7 @@ margin-right:5px;
 
 <p id="challenge"></p>
 
-<button onclick="resetGame()">Reset Corridor</button>
+<button onclick="resetCorridor()">Reset Corridors</button>
 
 <canvas id="map"></canvas>
 
@@ -82,18 +81,19 @@ canvas.height=rows*size
 let grid=[]
 let heatSources=[]
 let coldSources=[]
-let restricted=[]
 let corridor=[]
+let restricted=[]
+
 let drawing=false
-let startSource=null
 
-let level=1
+let existingLST=0
+let existingUHI=0
 
-const challenges=[
-{LST:32.5,UHI:4.5,cost:350},
-{LST:31.5,UHI:3.5,cost:320},
-{LST:30.5,UHI:2.8,cost:300}
-]
+const challenge={
+lstReduction:1.5,
+uhiReduction:1.2,
+budget:400
+}
 
 function initGrid(){
 
@@ -142,20 +142,20 @@ grid[r][c]="urban"
 
 }
 
+existingLST=calculateAverageTemp()
+existingUHI=existingLST-baseTemp
+
 updateChallenge()
 
 }
 
 function updateChallenge(){
 
-let ch=challenges[level-1]
-
 document.getElementById("challenge").innerText=
 
-"Level "+level+
-" | Target LST ≤ "+ch.LST+
-"°C | UHI ≤ "+ch.UHI+
-"°C | Cost ≤ "+ch.cost
+"Challenge: Reduce LST ≥ "+challenge.lstReduction+
+"°C | Reduce UHI ≥ "+challenge.uhiReduction+
+"°C | Budget ≤ "+challenge.budget
 
 }
 
@@ -199,6 +199,24 @@ t-=5/(d+1)
 t-=corridorCooling(r,c)
 
 return t
+
+}
+
+function calculateAverageTemp(){
+
+let total=0
+let count=0
+
+for(let r=0;r<rows;r++){
+for(let c=0;c<cols;c++){
+
+total+=cellTemp(r,c)
+count++
+
+}
+}
+
+return total/count
 
 }
 
@@ -258,17 +276,14 @@ updateStats()
 
 canvas.addEventListener("mousedown",function(e){
 
+drawing=true
+
 let rect=canvas.getBoundingClientRect()
+
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
-if(grid[r][c]=="cold"){
-
-startSource={r,c}
-drawing=true
-corridor=[{r,c}]
-
-}
+corridor.push({r,c})
 
 })
 
@@ -277,6 +292,7 @@ canvas.addEventListener("mousemove",function(e){
 if(!drawing) return
 
 let rect=canvas.getBoundingClientRect()
+
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
@@ -286,117 +302,61 @@ if(grid[r][c]=="restricted") return
 
 let last=corridor[corridor.length-1]
 
-if(last.r!=r || last.c!=c){
+if(last.r!=r||last.c!=c){
 
 corridor.push({r,c})
-
 draw()
 
 }
 
 })
 
-canvas.addEventListener("mouseup",function(e){
-
-if(!drawing) return
+canvas.addEventListener("mouseup",function(){
 
 drawing=false
-
-let last=corridor[corridor.length-1]
-
-if(grid[last.r][last.c]=="cold" &&
-!(last.r==startSource.r && last.c==startSource.c)){
-
-checkWin()
-
-}else{
-
-alert("Corridor must connect two cold sources!")
-
-corridor=[]
-
-}
-
-draw()
 
 })
 
 function updateStats(){
 
-let total=0
-let count=0
+let newLST=calculateAverageTemp()
+let newUHI=newLST-baseTemp
 
-for(let r=0;r<rows;r++){
-
-for(let c=0;c<cols;c++){
-
-total+=cellTemp(r,c)
-count++
-
-}
-
-}
-
-let avg=total/count
-let uhi=avg-baseTemp
 let cost=corridor.length*12
+
+let lstReduction=existingLST-newLST
+let uhiReduction=existingUHI-newUHI
 
 document.getElementById("stats").innerText=
 
-"Average LST: "+avg.toFixed(2)+
-"°C | UHI: "+uhi.toFixed(2)+
-"°C | Cost: "+cost
+"Existing LST: "+existingLST.toFixed(2)+"°C | "+
+"New LST: "+newLST.toFixed(2)+"°C | "+
+"LST Reduction: "+lstReduction.toFixed(2)+"°C | "+
+
+"Existing UHI: "+existingUHI.toFixed(2)+"°C | "+
+"New UHI: "+newUHI.toFixed(2)+"°C | "+
+"UHI Reduction: "+uhiReduction.toFixed(2)+"°C | "+
+
+"Cost: "+cost
+
+checkChallenge(lstReduction,uhiReduction,cost)
 
 }
 
-function checkWin(){
+function checkChallenge(lstRed,uhiRed,cost){
 
-let total=0
-let count=0
+if(lstRed>=challenge.lstReduction &&
+uhiRed>=challenge.uhiReduction &&
+cost<=challenge.budget){
 
-for(let r=0;r<rows;r++){
-
-for(let c=0;c<cols;c++){
-
-total+=cellTemp(r,c)
-count++
-
-}
-
-}
-
-let avg=total/count
-let uhi=avg-baseTemp
-let cost=corridor.length*12
-
-let ch=challenges[level-1]
-
-if(avg<=ch.LST && uhi<=ch.UHI && cost<=ch.cost){
-
-alert("Level Completed!")
-
-level++
-
-if(level>challenges.length){
-
-alert("All Levels Completed!")
-
-}else{
-
-initGrid()
-draw()
-
-}
-
-}else{
-
-alert("Challenge Failed! Try again.")
+document.getElementById("stats").innerText +=
+" | Challenge Completed!"
 
 }
 
 }
 
-function resetGame(){
+function resetCorridor(){
 
 corridor=[]
 draw()
