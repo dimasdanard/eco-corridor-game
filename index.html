@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Eco Corridor Planner</title>
+<style>
+
+body{
+text-align:center;
+font-family:Arial;
+background:#222;
+color:white;
+}
+
+canvas{
+background:white;
+border:2px solid black;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Eco Corridor Planner</h1>
+<p>Klik grid untuk membuat jalur koridor ekologis</p>
+
+<canvas id="map"></canvas>
+
+<p id="score"></p>
+
+<script>
+
+const canvas = document.getElementById("map");
+const ctx = canvas.getContext("2d");
+
+const rows = 15;
+const cols = 15;
+const size = 30;
+
+canvas.width = cols * size;
+canvas.height = rows * size;
+
+let grid = [];
+let path = [];
+
+function createGrid(){
+
+for(let r=0;r<rows;r++){
+
+grid[r] = [];
+
+for(let c=0;c<cols;c++){
+
+let rand = Math.random();
+
+if(rand < 0.1)
+grid[r][c] = "obstacle";
+
+else if(rand < 0.2)
+grid[r][c] = "heat";
+
+else if(rand < 0.3)
+grid[r][c] = "cold";
+
+else
+grid[r][c] = "land";
+
+}
+
+}
+
+}
+
+function draw(){
+
+for(let r=0;r<rows;r++){
+
+for(let c=0;c<cols;c++){
+
+let type = grid[r][c];
+
+if(type=="obstacle") ctx.fillStyle="black";
+else if(type=="heat") ctx.fillStyle="red";
+else if(type=="cold") ctx.fillStyle="blue";
+else ctx.fillStyle="green";
+
+ctx.fillRect(c*size,r*size,size,size);
+ctx.strokeRect(c*size,r*size,size,size);
+
+}
+
+}
+
+ctx.fillStyle="yellow";
+
+for(let p of path){
+
+ctx.fillRect(p.c*size,p.r*size,size,size)
+
+}
+
+}
+
+canvas.addEventListener("click",function(e){
+
+let rect = canvas.getBoundingClientRect()
+
+let c = Math.floor((e.clientX-rect.left)/size)
+let r = Math.floor((e.clientY-rect.top)/size)
+
+if(grid[r][c]!="obstacle"){
+
+path.push({r:r,c:c})
+
+calculate()
+
+draw()
+
+}
+
+})
+
+function calculate(){
+
+let heat=0
+let cold=0
+
+for(let p of path){
+
+if(grid[p.r][p.c]=="heat") heat++
+if(grid[p.r][p.c]=="cold") cold++
+
+}
+
+let score=(heat*2)-(cold*1.5)+path.length
+
+document.getElementById("score").innerText=
+"Heat:"+heat+" Cold:"+cold+" Length:"+path.length+" Cost:"+score.toFixed(2)
+
+}
+
+createGrid()
+draw()
+
+</script>
+
+</body>
+</html>
