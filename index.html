@@ -9,24 +9,33 @@ body{
 font-family:Arial;
 background:#1b1b1b;
 color:white;
+margin:0;
 }
 
-.container{
+.wrapper{
 display:flex;
 justify-content:center;
+align-items:flex-start;
 margin-top:20px;
+}
+
+.leftpanel{
+width:220px;
+margin-right:20px;
+text-align:left;
+}
+
+.rightpanel{
+width:240px;
+margin-left:20px;
+text-align:left;
 }
 
 canvas{
 background:white;
 border:2px solid black;
 cursor:pointer;
-}
-
-.sidepanel{
-margin-left:25px;
-text-align:left;
-width:260px;
+flex-shrink:0;
 }
 
 .box{
@@ -49,8 +58,7 @@ margin-top:5px;
 
 .guide{
 background:#2b2b2b;
-padding:8px;
-margin-top:10px;
+padding:10px;
 font-size:13px;
 }
 
@@ -61,11 +69,50 @@ font-size:13px;
 
 <h2 style="text-align:center">Urban Ecological Corridor Challenge</h2>
 
-<div class="container">
+<div class="wrapper">
+
+<div class="leftpanel">
+
+<div class="guide">
+
+<b>GUIDE</b>
+
+<br><br>
+
+<b>Create Corridor</b><br>
+Click cells to draw a corridor path.<br>
+Double-click to finish the corridor.
+
+<br><br>
+
+<b>Delete Corridor</b><br>
+Use the Delete button in the corridor list.
+
+<br><br>
+
+<b>Reset</b><br>
+Remove all corridors and start again.
+
+<br><br>
+
+<b>Next Level</b><br>
+Press PLAN to evaluate your strategy.
+
+To pass the level you must:
+
+• Reduce LST<br>
+• Reduce UHI<br>
+• Stay within the budget
+
+</div>
+
+</div>
+
 
 <canvas id="map" width="500" height="500"></canvas>
 
-<div class="sidepanel">
+
+<div class="rightpanel">
 
 <h3>Legend</h3>
 
@@ -89,38 +136,6 @@ font-size:13px;
 <p id="challenge"></p>
 <p id="stats"></p>
 
-<div class="guide">
-
-<b>Guide</b>
-
-<br><br>
-
-<b>Create Corridor</b><br>
-Click cells to draw a corridor path.<br>
-Double-click to finish the corridor.
-
-<br><br>
-
-<b>Delete Corridor</b><br>
-Use the Delete button in the corridor layer list.
-
-<br><br>
-
-<b>Reset</b><br>
-Remove all corridors and start planning again.
-
-<br><br>
-
-<b>Next Level</b><br>
-Press <b>PLAN</b> to evaluate your design.<br>
-You must meet the target:
-
-• Minimum LST reduction  
-• Minimum UHI reduction  
-• Stay within the budget
-
-</div>
-
 </div>
 
 </div>
@@ -129,7 +144,7 @@ You must meet the target:
 
 const rows=20
 const cols=20
-const size=25
+const cellSize=25
 const baseTemp=28
 
 const canvas=document.getElementById("map")
@@ -154,15 +169,15 @@ const levels=[
 {lstReduction:2.5,uhiReduction:2.0,budget:320}
 ]
 
-function getMouseCell(e){
+function getCell(e){
 
 const rect=canvas.getBoundingClientRect()
 
 const x=e.clientX-rect.left
 const y=e.clientY-rect.top
 
-const c=Math.floor(x/size)
-const r=Math.floor(y/size)
+const c=Math.floor(x/cellSize)
+const r=Math.floor(y/cellSize)
 
 return {r,c}
 
@@ -311,27 +326,27 @@ else if(t>30) color="yellow"
 else color="lightblue"
 
 ctx.fillStyle=color
-ctx.fillRect(c*size,r*size,size,size)
-ctx.strokeRect(c*size,r*size,size,size)
+ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
+ctx.strokeRect(c*cellSize,r*cellSize,cellSize,cellSize)
 
 if(grid[r][c]=="heat"){
 
 ctx.fillStyle="black"
-ctx.fillRect(c*size+8,r*size+8,10,10)
+ctx.fillRect(c*cellSize+8,r*cellSize+8,10,10)
 
 }
 
 if(grid[r][c]=="cold"){
 
 ctx.fillStyle="green"
-ctx.fillRect(c*size+8,r*size+8,10,10)
+ctx.fillRect(c*cellSize+8,r*cellSize+8,10,10)
 
 }
 
 if(grid[r][c]=="restricted"){
 
 ctx.fillStyle="gray"
-ctx.fillRect(c*size,r*size,size,size)
+ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize)
 
 }
 
@@ -343,14 +358,14 @@ ctx.fillStyle="lime"
 
 corridors.forEach(line=>{
 line.forEach(cell=>{
-ctx.fillRect(cell.c*size,cell.r*size,size,size)
+ctx.fillRect(cell.c*cellSize,cell.r*cellSize,cellSize,cellSize)
 })
 })
 
 ctx.fillStyle="cyan"
 
 currentCorridor.forEach(cell=>{
-ctx.fillRect(cell.c*size,cell.r*size,size,size)
+ctx.fillRect(cell.c*cellSize,cell.r*cellSize,cellSize,cellSize)
 })
 
 updateStats()
@@ -359,7 +374,7 @@ updateStats()
 
 canvas.addEventListener("click",function(e){
 
-let {r,c}=getMouseCell(e)
+let {r,c}=getCell(e)
 
 if(grid[r][c]=="restricted") return
 
@@ -418,7 +433,6 @@ function deleteCorridor(i){
 corridors.splice(i,1)
 
 updateLayers()
-
 draw()
 
 }
