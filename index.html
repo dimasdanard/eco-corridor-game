@@ -1,38 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Urban Heat Mitigation Corridor Game</title>
+<title>Urban Ecological Corridor Planner</title>
 
 <style>
 
 body{
 font-family:Arial;
-text-align:center;
 background:#1b1b1b;
 color:white;
+}
+
+.container{
+display:flex;
+justify-content:center;
+margin-top:20px;
 }
 
 canvas{
 background:white;
 border:2px solid black;
-margin-top:10px;
 }
 
-button{
-margin:5px;
-padding:8px 15px;
-font-size:14px;
-}
-
-#legend{
-margin-top:10px;
+.sidepanel{
+margin-left:25px;
+text-align:left;
 }
 
 .box{
+width:18px;
+height:18px;
 display:inline-block;
-width:20px;
-height:20px;
-margin-right:5px;
+margin-right:8px;
+}
+
+button{
+padding:8px 14px;
+margin:4px;
+font-size:14px;
 }
 
 </style>
@@ -40,17 +45,13 @@ margin-right:5px;
 
 <body>
 
-<h2>Urban Ecological Corridor Challenge</h2>
+<h2 style="text-align:center">Urban Ecological Corridor Challenge</h2>
 
-<p id="challenge"></p>
-
-<button onclick="resetCorridor()">Reset Corridors</button>
+<div class="container">
 
 <canvas id="map"></canvas>
 
-<p id="stats"></p>
-
-<div id="legend">
+<div class="sidepanel">
 
 <h3>Legend</h3>
 
@@ -61,7 +62,18 @@ margin-right:5px;
 <div><span class="box" style="background:black"></span>Heat Source</div>
 <div><span class="box" style="background:green"></span>Cold Source</div>
 <div><span class="box" style="background:gray"></span>Restricted Area</div>
-<div><span class="box" style="background:lime"></span>Ecological Corridor</div>
+<div><span class="box" style="background:lime"></span>Corridor</div>
+
+<br>
+
+<button onclick="resetCorridors()">Reset</button>
+<button onclick="evaluatePlan()">PLAN</button>
+
+<p id="challenge"></p>
+
+<p id="stats"></p>
+
+</div>
 
 </div>
 
@@ -81,19 +93,22 @@ canvas.height=rows*size
 let grid=[]
 let heatSources=[]
 let coldSources=[]
-let corridor=[]
 let restricted=[]
 
+let corridors=[]
+let currentCorridor=[]
 let drawing=false
 
 let existingLST=0
 let existingUHI=0
 
-const challenge={
-lstReduction:1.5,
-uhiReduction:1.2,
-budget:400
-}
+let level=1
+
+const levels=[
+{lstReduction:1.5,uhiReduction:1.0,budget:350},
+{lstReduction:2.2,uhiReduction:1.6,budget:320},
+{lstReduction:3.0,uhiReduction:2.2,budget:300}
+]
 
 function initGrid(){
 
@@ -101,7 +116,8 @@ grid=[]
 heatSources=[]
 coldSources=[]
 restricted=[]
-corridor=[]
+corridors=[]
+currentCorridor=[]
 
 for(let r=0;r<rows;r++){
 
@@ -151,11 +167,14 @@ updateChallenge()
 
 function updateChallenge(){
 
+let ch=levels[level-1]
+
 document.getElementById("challenge").innerText=
 
-"Challenge: Reduce LST ≥ "+challenge.lstReduction+
-"°C | Reduce UHI ≥ "+challenge.uhiReduction+
-"°C | Budget ≤ "+challenge.budget
+"LEVEL "+level+
+"\nReduce LST ≥ "+ch.lstReduction+"°C"+
+"\nReduce UHI ≥ "+ch.uhiReduction+"°C"+
+"\nBudget ≤ "+ch.budget
 
 }
 
@@ -169,12 +188,15 @@ function corridorCooling(r,c){
 
 let cool=0
 
-corridor.forEach(cell=>{
+corridors.forEach(line=>{
+line.forEach(cell=>{
 
 let d=distance(cell,{r,c})
 
 if(d<2) cool+=0.8
 else if(d<3) cool+=0.3
+
+})
 
 })
 
@@ -266,8 +288,10 @@ ctx.fillRect(c*size,r*size,size,size)
 
 ctx.fillStyle="lime"
 
-corridor.forEach(p=>{
-ctx.fillRect(p.c*size,p.r*size,size,size)
+corridors.forEach(line=>{
+line.forEach(cell=>{
+ctx.fillRect(cell.c*size,cell.r*size,size,size)
+})
 })
 
 updateStats()
@@ -276,14 +300,19 @@ updateStats()
 
 canvas.addEventListener("mousedown",function(e){
 
+if(corridors.length>=3){
+alert("Maximum 3 corridors allowed")
+return
+}
+
 drawing=true
+currentCorridor=[]
 
 let rect=canvas.getBoundingClientRect()
-
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
-corridor.push({r,c})
+currentCorridor.push({r,c})
 
 })
 
@@ -296,16 +325,22 @@ let rect=canvas.getBoundingClientRect()
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
-if(r<0||c<0||r>=rows||c>=cols) return
+if(grid[r][c]=="restricted"){
 
-if(grid[r][c]=="restricted") return
+alert("Corridor invalid: blocked by restricted area")
+drawing=false
+currentCorridor=[]
+return
 
-let last=corridor[corridor.length-1]
+}
+
+let last=currentCorridor[currentCorridor.length-1]
 
 if(last.r!=r||last.c!=c){
 
-corridor.push({r,c})
-draw()
+currentCorridor.push({r,c})
+
+drawPreview()
 
 }
 
@@ -313,52 +348,109 @@ draw()
 
 canvas.addEventListener("mouseup",function(){
 
+if(!drawing) return
+
 drawing=false
 
+corridors.push([...currentCorridor])
+
+draw()
+
 })
+
+function drawPreview(){
+
+draw()
+
+ctx.fillStyle="lime"
+
+currentCorridor.forEach(cell=>{
+ctx.fillRect(cell.c*size,cell.r*size,size,size)
+})
+
+}
 
 function updateStats(){
 
 let newLST=calculateAverageTemp()
 let newUHI=newLST-baseTemp
 
-let cost=corridor.length*12
+let totalCells=0
+
+corridors.forEach(line=>{
+totalCells+=line.length
+})
+
+let cost=totalCells*12
+
+document.getElementById("stats").innerText=
+
+"Existing LST: "+existingLST.toFixed(2)+"°C\n"+
+"New LST: "+newLST.toFixed(2)+"°C\n"+
+"LST Reduction: "+(existingLST-newLST).toFixed(2)+"°C\n\n"+
+
+"Existing UHI: "+existingUHI.toFixed(2)+"°C\n"+
+"New UHI: "+newUHI.toFixed(2)+"°C\n"+
+"UHI Reduction: "+(existingUHI-newUHI).toFixed(2)+"°C\n\n"+
+
+"Cost: "+cost
+
+}
+
+function evaluatePlan(){
+
+let newLST=calculateAverageTemp()
+let newUHI=newLST-baseTemp
 
 let lstReduction=existingLST-newLST
 let uhiReduction=existingUHI-newUHI
 
-document.getElementById("stats").innerText=
+let totalCells=0
 
-"Existing LST: "+existingLST.toFixed(2)+"°C | "+
-"New LST: "+newLST.toFixed(2)+"°C | "+
-"LST Reduction: "+lstReduction.toFixed(2)+"°C | "+
+corridors.forEach(line=>{
+totalCells+=line.length
+})
 
-"Existing UHI: "+existingUHI.toFixed(2)+"°C | "+
-"New UHI: "+newUHI.toFixed(2)+"°C | "+
-"UHI Reduction: "+uhiReduction.toFixed(2)+"°C | "+
+let cost=totalCells*12
 
-"Cost: "+cost
+let ch=levels[level-1]
 
-checkChallenge(lstReduction,uhiReduction,cost)
+if(cost>ch.budget){
 
-}
+alert("Plan rejected: Budget exceeded")
 
-function checkChallenge(lstRed,uhiRed,cost){
-
-if(lstRed>=challenge.lstReduction &&
-uhiRed>=challenge.uhiReduction &&
-cost<=challenge.budget){
-
-document.getElementById("stats").innerText +=
-" | Challenge Completed!"
+return
 
 }
 
+if(lstReduction<ch.lstReduction || uhiReduction<ch.uhiReduction){
+
+alert("Plan insufficient: Cooling impact too low. Re-plan.")
+
+return
+
 }
 
-function resetCorridor(){
+alert("Level Completed!")
 
-corridor=[]
+level++
+
+if(level>levels.length){
+
+alert("All levels completed!")
+
+}else{
+
+initGrid()
+draw()
+
+}
+
+}
+
+function resetCorridors(){
+
+corridors=[]
 draw()
 
 }
