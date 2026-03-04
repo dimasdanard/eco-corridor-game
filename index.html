@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Urban Ecological Corridor Planner</title>
+<title>Urban Ecological Corridor Challenge</title>
 
 <style>
 
 body{
-font-family:Segoe UI,Arial;
+font-family:Segoe UI;
 background:#121212;
 color:white;
 margin:0;
@@ -15,7 +15,6 @@ margin:0;
 .wrapper{
 display:flex;
 justify-content:center;
-align-items:flex-start;
 margin-top:20px;
 }
 
@@ -23,7 +22,7 @@ margin-top:20px;
 background:#1f1f1f;
 padding:15px;
 border-radius:8px;
-box-shadow:0 0 10px rgba(0,0,0,0.4);
+box-shadow:0 0 10px rgba(0,0,0,0.5);
 }
 
 .leftpanel{
@@ -40,7 +39,6 @@ canvas{
 background:#111;
 border-radius:8px;
 border:2px solid #333;
-cursor:pointer;
 }
 
 .box{
@@ -84,22 +82,20 @@ border-radius:4px;
 
 <h3>Guide</h3>
 
-Create corridor:<br>
-Click cells to draw path.<br>
-Double click to finish.
+Click cells to draw corridor.<br>
+Double click to finish corridor.
 
 <br><br>
 
-Delete corridor:<br>
-Use Delete button.
+Delete corridor using layer list.
 
 <br><br>
 
-Reset removes all corridors.
+Press PLAN to test your strategy.
 
 <br><br>
 
-Press PLAN to evaluate strategy.
+Reach the target to unlock next level.
 
 </div>
 
@@ -125,6 +121,10 @@ Press PLAN to evaluate strategy.
 <h3>Corridor Layers</h3>
 <div id="layers"></div>
 
+<h3>Level Target</h3>
+<p id="target"></p>
+
+<h3>Statistics</h3>
 <p id="stats"></p>
 
 </div>
@@ -144,36 +144,46 @@ const ctx=canvas.getContext("2d")
 let grid=[]
 let heatSources=[]
 let coldSources=[]
-let restricted=[]
-
 let corridors=[]
 let current=[]
 
 let existingLST=0
 let existingUHI=0
 
+let level=0
+
+const levels=[
+{lst:0.8,uhi:0.6,budget:400},
+{lst:1.5,uhi:1.2,budget:350},
+{lst:2.3,uhi:1.8,budget:320}
+]
+
 function getCell(e){
 
 const rect=canvas.getBoundingClientRect()
 
-const x=e.clientX-rect.left
-const y=e.clientY-rect.top
-
 return{
-r:Math.floor(y/cell),
-c:Math.floor(x/cell)
+r:Math.floor((e.clientY-rect.top)/cell),
+c:Math.floor((e.clientX-rect.left)/cell)
 }
 
 }
 
-function initGrid(){
+function startLevel(){
+
+corridors=[]
+current=[]
+generateMap()
+updateTarget()
+draw()
+
+}
+
+function generateMap(){
 
 grid=[]
 heatSources=[]
 coldSources=[]
-restricted=[]
-corridors=[]
-current=[]
 
 for(let r=0;r<rows;r++){
 
@@ -215,8 +225,6 @@ grid[r][c]="urban"
 
 calculateBaseline()
 
-draw()
-
 }
 
 function calculateBaseline(){
@@ -244,7 +252,6 @@ let min=28
 let max=36
 
 let ratio=(t-min)/(max-min)
-
 ratio=Math.max(0,Math.min(1,ratio))
 
 let r=Math.floor(255*ratio)
@@ -383,22 +390,6 @@ current.push({r,c})
 
 draw()
 
-ctx.beginPath()
-
-current.forEach((p,i)=>{
-
-let x=p.c*cell+12
-let y=p.r*cell+12
-
-if(i==0) ctx.moveTo(x,y)
-else ctx.lineTo(x,y)
-
-})
-
-ctx.strokeStyle="#00ffff"
-ctx.lineWidth=3
-ctx.stroke()
-
 })
 
 canvas.addEventListener("dblclick",function(){
@@ -411,16 +402,11 @@ return
 
 }
 
-if(confirm("Finish corridor?")){
-
 corridors.push([...current])
-
-}
-
 current=[]
 
-draw()
 updateLayers()
+draw()
 
 })
 
@@ -487,20 +473,80 @@ document.getElementById("stats").innerText=
 "Existing LST: "+existingLST.toFixed(2)+
 "\nNew LST: "+newLST.toFixed(2)+
 "\nLST Reduction: "+(existingLST-newLST).toFixed(2)+
+
 "\n\nExisting UHI: "+existingUHI.toFixed(2)+
 "\nNew UHI: "+newUHI.toFixed(2)+
 "\nUHI Reduction: "+(existingUHI-newUHI).toFixed(2)+
+
 "\n\nCost: "+cost
+
+}
+
+function updateTarget(){
+
+let t=levels[level]
+
+document.getElementById("target").innerText=
+
+"LST Reduction ≥ "+t.lst+
+"\nUHI Reduction ≥ "+t.uhi+
+"\nBudget ≤ "+t.budget
 
 }
 
 function evaluatePlan(){
 
-alert("Evaluation system can be expanded here")
+let total=0
+let count=0
+
+for(let r=0;r<rows;r++){
+for(let c=0;c<cols;c++){
+
+total+=cellTemp(r,c)
+count++
+
+}
+}
+
+let newLST=total/count
+let newUHI=newLST-baseTemp
+
+let lstReduction=existingLST-newLST
+let uhiReduction=existingUHI-newUHI
+
+let cost=0
+
+corridors.forEach(c=>{
+cost+=c.length*12
+})
+
+let target=levels[level]
+
+if(lstReduction>=target.lst && uhiReduction>=target.uhi && cost<=target.budget){
+
+alert("Level Completed!")
+
+level++
+
+if(level>=levels.length){
+
+alert("You completed all levels!")
+
+}else{
+
+startLevel()
 
 }
 
-initGrid()
+}else{
+
+alert("Target not achieved. Re-plan your corridors.")
+
+}
+
+}
+
+startLevel()
 
 </script>
 
