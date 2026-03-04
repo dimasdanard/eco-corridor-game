@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>UHI Ecological Corridor Simulator</title>
+<title>Urban Heat Mitigation Corridor Game</title>
 
 <style>
 
 body{
 font-family:Arial;
 text-align:center;
-background:#1e1e1e;
+background:#1b1b1b;
 color:white;
 }
 
@@ -16,6 +16,12 @@ canvas{
 background:white;
 border:2px solid black;
 margin-top:10px;
+}
+
+button{
+margin:5px;
+padding:8px 15px;
+font-size:14px;
 }
 
 #legend{
@@ -35,8 +41,11 @@ margin-right:5px;
 
 <body>
 
-<h2>Urban Heat Island Corridor Simulator</h2>
-<p>Klik lalu tarik untuk membuat ecological corridor</p>
+<h2>Urban Ecological Corridor Challenge</h2>
+
+<p id="challenge"></p>
+
+<button onclick="resetGame()">Reset Corridor</button>
 
 <canvas id="map"></canvas>
 
@@ -44,40 +53,55 @@ margin-right:5px;
 
 <div id="legend">
 
-<h3>Legenda</h3>
+<h3>Legend</h3>
 
-<div><span class="box" style="background:red"></span> Sangat Panas</div>
-<div><span class="box" style="background:orange"></span> Panas</div>
-<div><span class="box" style="background:yellow"></span> Sedang</div>
-<div><span class="box" style="background:lightblue"></span> Dingin</div>
-<div><span class="box" style="background:black"></span> Heat Source</div>
-<div><span class="box" style="background:green"></span> Cold Source</div>
-<div><span class="box" style="background:lime"></span> Ecological Corridor</div>
+<div><span class="box" style="background:red"></span>Very Hot</div>
+<div><span class="box" style="background:orange"></span>Hot</div>
+<div><span class="box" style="background:yellow"></span>Moderate</div>
+<div><span class="box" style="background:lightblue"></span>Cool</div>
+<div><span class="box" style="background:black"></span>Heat Source</div>
+<div><span class="box" style="background:green"></span>Cold Source</div>
+<div><span class="box" style="background:gray"></span>Restricted Area</div>
+<div><span class="box" style="background:lime"></span>Ecological Corridor</div>
 
 </div>
 
 <script>
 
-const rows = 20
-const cols = 20
-const size = 25
+const rows=20
+const cols=20
+const size=25
+const baseTemp=28
 
-const baseTemp = 28
+const canvas=document.getElementById("map")
+const ctx=canvas.getContext("2d")
 
-const canvas = document.getElementById("map")
-const ctx = canvas.getContext("2d")
-
-canvas.width = cols*size
-canvas.height = rows*size
+canvas.width=cols*size
+canvas.height=rows*size
 
 let grid=[]
 let heatSources=[]
 let coldSources=[]
-let corridors=[]
+let restricted=[]
+let corridor=[]
+let drawing=false
+let startSource=null
 
-let startCell=null
+let level=1
+
+const challenges=[
+{LST:32.5,UHI:4.5,cost:350},
+{LST:31.5,UHI:3.5,cost:320},
+{LST:30.5,UHI:2.8,cost:300}
+]
 
 function initGrid(){
+
+grid=[]
+heatSources=[]
+coldSources=[]
+restricted=[]
+corridor=[]
 
 for(let r=0;r<rows;r++){
 
@@ -101,6 +125,13 @@ coldSources.push({r,c})
 
 }
 
+else if(rand<0.18){
+
+grid[r][c]="restricted"
+restricted.push({r,c})
+
+}
+
 else{
 
 grid[r][c]="urban"
@@ -110,6 +141,21 @@ grid[r][c]="urban"
 }
 
 }
+
+updateChallenge()
+
+}
+
+function updateChallenge(){
+
+let ch=challenges[level-1]
+
+document.getElementById("challenge").innerText=
+
+"Level "+level+
+" | Target LST ≤ "+ch.LST+
+"°C | UHI ≤ "+ch.UHI+
+"°C | Cost ≤ "+ch.cost
 
 }
 
@@ -121,42 +167,38 @@ return Math.sqrt((a.r-b.r)**2+(a.c-b.c)**2)
 
 function corridorCooling(r,c){
 
-let cooling=0
+let cool=0
 
-corridors.forEach(cell=>{
+corridor.forEach(cell=>{
 
 let d=distance(cell,{r,c})
 
-if(d<2) cooling+=0.8
-else if(d<3) cooling+=0.3
+if(d<2) cool+=0.8
+else if(d<3) cool+=0.3
 
 })
 
-return cooling
+return cool
 
 }
 
-function cellTemperature(r,c){
+function cellTemp(r,c){
 
-let temp=baseTemp
+let t=baseTemp
 
 heatSources.forEach(h=>{
-
 let d=distance({r,c},h)
-temp+=6/(d+1)
-
+t+=6/(d+1)
 })
 
 coldSources.forEach(cl=>{
-
 let d=distance({r,c},cl)
-temp-=5/(d+1)
-
+t-=5/(d+1)
 })
 
-temp -= corridorCooling(r,c)
+t-=corridorCooling(r,c)
 
-return temp
+return t
 
 }
 
@@ -166,7 +208,7 @@ for(let r=0;r<rows;r++){
 
 for(let c=0;c<cols;c++){
 
-let t=cellTemperature(r,c)
+let t=cellTemp(r,c)
 
 let color
 
@@ -193,75 +235,87 @@ ctx.fillRect(c*size+8,r*size+8,10,10)
 
 }
 
+if(grid[r][c]=="restricted"){
+
+ctx.fillStyle="gray"
+ctx.fillRect(c*size,r*size,size,size)
+
+}
+
 }
 
 }
 
 ctx.fillStyle="lime"
 
-corridors.forEach(p=>{
-
+corridor.forEach(p=>{
 ctx.fillRect(p.c*size,p.r*size,size,size)
-
 })
 
 updateStats()
 
 }
 
-function lineCells(a,b){
-
-let cells=[]
-
-let dx=b.c-a.c
-let dy=b.r-a.r
-
-let steps=Math.max(Math.abs(dx),Math.abs(dy))
-
-for(let i=0;i<=steps;i++){
-
-let r=Math.round(a.r + dy*i/steps)
-let c=Math.round(a.c + dx*i/steps)
-
-cells.push({r,c})
-
-}
-
-return cells
-
-}
-
 canvas.addEventListener("mousedown",function(e){
 
 let rect=canvas.getBoundingClientRect()
-
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
-startCell={r,c}
+if(grid[r][c]=="cold"){
+
+startSource={r,c}
+drawing=true
+corridor=[{r,c}]
+
+}
+
+})
+
+canvas.addEventListener("mousemove",function(e){
+
+if(!drawing) return
+
+let rect=canvas.getBoundingClientRect()
+let c=Math.floor((e.clientX-rect.left)/size)
+let r=Math.floor((e.clientY-rect.top)/size)
+
+if(r<0||c<0||r>=rows||c>=cols) return
+
+if(grid[r][c]=="restricted") return
+
+let last=corridor[corridor.length-1]
+
+if(last.r!=r || last.c!=c){
+
+corridor.push({r,c})
+
+draw()
+
+}
 
 })
 
 canvas.addEventListener("mouseup",function(e){
 
-if(!startCell) return
+if(!drawing) return
 
-let rect=canvas.getBoundingClientRect()
+drawing=false
 
-let c=Math.floor((e.clientX-rect.left)/size)
-let r=Math.floor((e.clientY-rect.top)/size)
+let last=corridor[corridor.length-1]
 
-let endCell={r,c}
+if(grid[last.r][last.c]=="cold" &&
+!(last.r==startSource.r && last.c==startSource.c)){
 
-let line=lineCells(startCell,endCell)
+checkWin()
 
-line.forEach(cell=>{
+}else{
 
-corridors.push(cell)
+alert("Corridor must connect two cold sources!")
 
-})
+corridor=[]
 
-startCell=null
+}
 
 draw()
 
@@ -269,29 +323,83 @@ draw()
 
 function updateStats(){
 
-let totalTemp=0
+let total=0
 let count=0
 
 for(let r=0;r<rows;r++){
 
 for(let c=0;c<cols;c++){
 
-totalTemp+=cellTemperature(r,c)
+total+=cellTemp(r,c)
 count++
 
 }
 
 }
 
-let avg=(totalTemp/count)
-
+let avg=total/count
 let uhi=avg-baseTemp
-
-let cost=corridors.length*12
+let cost=corridor.length*12
 
 document.getElementById("stats").innerText=
 
-"Average Temp: "+avg.toFixed(2)+"°C | UHI: "+uhi.toFixed(2)+"°C | Corridor Cost: "+cost
+"Average LST: "+avg.toFixed(2)+
+"°C | UHI: "+uhi.toFixed(2)+
+"°C | Cost: "+cost
+
+}
+
+function checkWin(){
+
+let total=0
+let count=0
+
+for(let r=0;r<rows;r++){
+
+for(let c=0;c<cols;c++){
+
+total+=cellTemp(r,c)
+count++
+
+}
+
+}
+
+let avg=total/count
+let uhi=avg-baseTemp
+let cost=corridor.length*12
+
+let ch=challenges[level-1]
+
+if(avg<=ch.LST && uhi<=ch.UHI && cost<=ch.cost){
+
+alert("Level Completed!")
+
+level++
+
+if(level>challenges.length){
+
+alert("All Levels Completed!")
+
+}else{
+
+initGrid()
+draw()
+
+}
+
+}else{
+
+alert("Challenge Failed! Try again.")
+
+}
+
+}
+
+function resetGame(){
+
+corridor=[]
+draw()
 
 }
 
