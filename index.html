@@ -25,6 +25,7 @@ border:2px solid black;
 .sidepanel{
 margin-left:25px;
 text-align:left;
+width:220px;
 }
 
 .box{
@@ -66,7 +67,6 @@ font-size:14px;
 
 <br>
 
-<button onclick="resetCorridors()">Reset</button>
 <button onclick="evaluatePlan()">PLAN</button>
 
 <p id="challenge"></p>
@@ -96,8 +96,8 @@ let coldSources=[]
 let restricted=[]
 
 let corridors=[]
-let currentCorridor=[]
-let drawing=false
+
+let startSource=null
 
 let existingLST=0
 let existingUHI=0
@@ -105,9 +105,9 @@ let existingUHI=0
 let level=1
 
 const levels=[
-{lstReduction:1.5,uhiReduction:1.0,budget:350},
-{lstReduction:2.2,uhiReduction:1.6,budget:320},
-{lstReduction:3.0,uhiReduction:2.2,budget:300}
+{lstReduction:0.8,uhiReduction:0.6,budget:400},
+{lstReduction:1.5,uhiReduction:1.2,budget:350},
+{lstReduction:2.5,uhiReduction:2.0,budget:320}
 ]
 
 function initGrid(){
@@ -117,7 +117,6 @@ heatSources=[]
 coldSources=[]
 restricted=[]
 corridors=[]
-currentCorridor=[]
 
 for(let r=0;r<rows;r++){
 
@@ -189,6 +188,7 @@ function corridorCooling(r,c){
 let cool=0
 
 corridors.forEach(line=>{
+
 line.forEach(cell=>{
 
 let d=distance(cell,{r,c})
@@ -298,75 +298,92 @@ updateStats()
 
 }
 
-canvas.addEventListener("mousedown",function(e){
-
-if(corridors.length>=3){
-alert("Maximum 3 corridors allowed")
-return
-}
-
-drawing=true
-currentCorridor=[]
+canvas.addEventListener("click",function(e){
 
 let rect=canvas.getBoundingClientRect()
+
 let c=Math.floor((e.clientX-rect.left)/size)
 let r=Math.floor((e.clientY-rect.top)/size)
 
-currentCorridor.push({r,c})
+if(grid[r][c]=="heat" || grid[r][c]=="cold"){
+
+if(startSource==null){
+
+startSource={r,c}
+
+}else{
+
+createCorridor(startSource,{r,c})
+
+startSource=null
+
+}
+
+}
+
+else{
+
+removeCorridor(r,c)
+
+}
 
 })
 
-canvas.addEventListener("mousemove",function(e){
+function createCorridor(a,b){
 
-if(!drawing) return
+if(corridors.length>=3){
 
-let rect=canvas.getBoundingClientRect()
+alert("Maximum 3 corridors allowed")
+return
 
-let c=Math.floor((e.clientX-rect.left)/size)
-let r=Math.floor((e.clientY-rect.top)/size)
+}
+
+let cells=[]
+
+let dx=b.c-a.c
+let dy=b.r-a.r
+
+let steps=Math.max(Math.abs(dx),Math.abs(dy))
+
+for(let i=0;i<=steps;i++){
+
+let r=Math.round(a.r + dy*i/steps)
+let c=Math.round(a.c + dx*i/steps)
 
 if(grid[r][c]=="restricted"){
 
-alert("Corridor invalid: blocked by restricted area")
-drawing=false
-currentCorridor=[]
+alert("Invalid corridor: blocked by restricted area")
 return
 
 }
 
-let last=currentCorridor[currentCorridor.length-1]
-
-if(last.r!=r||last.c!=c){
-
-currentCorridor.push({r,c})
-
-drawPreview()
+cells.push({r,c})
 
 }
 
-})
-
-canvas.addEventListener("mouseup",function(){
-
-if(!drawing) return
-
-drawing=false
-
-corridors.push([...currentCorridor])
+corridors.push(cells)
 
 draw()
 
-})
+}
 
-function drawPreview(){
+function removeCorridor(r,c){
 
+for(let i=0;i<corridors.length;i++){
+
+for(let cell of corridors[i]){
+
+if(cell.r==r && cell.c==c){
+
+corridors.splice(i,1)
 draw()
+return
 
-ctx.fillStyle="lime"
+}
 
-currentCorridor.forEach(cell=>{
-ctx.fillRect(cell.c*size,cell.r*size,size,size)
-})
+}
+
+}
 
 }
 
@@ -417,16 +434,14 @@ let ch=levels[level-1]
 
 if(cost>ch.budget){
 
-alert("Plan rejected: Budget exceeded")
-
+alert("Plan rejected: budget exceeded")
 return
 
 }
 
 if(lstReduction<ch.lstReduction || uhiReduction<ch.uhiReduction){
 
-alert("Plan insufficient: Cooling impact too low. Re-plan.")
-
+alert("Plan insufficient: cooling impact too low")
 return
 
 }
@@ -445,13 +460,6 @@ initGrid()
 draw()
 
 }
-
-}
-
-function resetCorridors(){
-
-corridors=[]
-draw()
 
 }
 
