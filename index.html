@@ -20,12 +20,13 @@ margin-top:20px;
 canvas{
 background:white;
 border:2px solid black;
+cursor:pointer;
 }
 
 .sidepanel{
 margin-left:25px;
 text-align:left;
-width:220px;
+width:250px;
 }
 
 .box{
@@ -36,9 +37,14 @@ margin-right:8px;
 }
 
 button{
-padding:8px 14px;
-margin:4px;
-font-size:14px;
+padding:6px 10px;
+margin:3px;
+}
+
+.layer{
+background:#2b2b2b;
+padding:5px;
+margin-top:5px;
 }
 
 </style>
@@ -67,10 +73,13 @@ font-size:14px;
 
 <br>
 
+<button onclick="resetCorridors()">Reset</button>
 <button onclick="evaluatePlan()">PLAN</button>
 
-<p id="challenge"></p>
+<h3>Corridor Layers</h3>
+<div id="layers"></div>
 
+<p id="challenge"></p>
 <p id="stats"></p>
 
 </div>
@@ -96,8 +105,7 @@ let coldSources=[]
 let restricted=[]
 
 let corridors=[]
-
-let startSource=null
+let currentCorridor=[]
 
 let existingLST=0
 let existingUHI=0
@@ -110,6 +118,23 @@ const levels=[
 {lstReduction:2.5,uhiReduction:2.0,budget:320}
 ]
 
+function getMouseCell(e){
+
+const rect=canvas.getBoundingClientRect()
+
+const scaleX=canvas.width/rect.width
+const scaleY=canvas.height/rect.height
+
+const x=(e.clientX-rect.left)*scaleX
+const y=(e.clientY-rect.top)*scaleY
+
+const c=Math.floor(x/size)
+const r=Math.floor(y/size)
+
+return {r,c}
+
+}
+
 function initGrid(){
 
 grid=[]
@@ -117,6 +142,7 @@ heatSources=[]
 coldSources=[]
 restricted=[]
 corridors=[]
+currentCorridor=[]
 
 for(let r=0;r<rows;r++){
 
@@ -143,7 +169,6 @@ coldSources.push({r,c})
 else if(rand<0.18){
 
 grid[r][c]="restricted"
-restricted.push({r,c})
 
 }
 
@@ -161,6 +186,7 @@ existingLST=calculateAverageTemp()
 existingUHI=existingLST-baseTemp
 
 updateChallenge()
+updateLayers()
 
 }
 
@@ -171,15 +197,9 @@ let ch=levels[level-1]
 document.getElementById("challenge").innerText=
 
 "LEVEL "+level+
-"\nReduce LST ≥ "+ch.lstReduction+"°C"+
-"\nReduce UHI ≥ "+ch.uhiReduction+"°C"+
+"\nReduce LST ≥ "+ch.lstReduction+
+"\nReduce UHI ≥ "+ch.uhiReduction+
 "\nBudget ≤ "+ch.budget
-
-}
-
-function distance(a,b){
-
-return Math.sqrt((a.r-b.r)**2+(a.c-b.c)**2)
 
 }
 
@@ -191,7 +211,7 @@ corridors.forEach(line=>{
 
 line.forEach(cell=>{
 
-let d=distance(cell,{r,c})
+let d=Math.sqrt((cell.r-r)**2+(cell.c-c)**2)
 
 if(d<2) cool+=0.8
 else if(d<3) cool+=0.3
@@ -209,12 +229,12 @@ function cellTemp(r,c){
 let t=baseTemp
 
 heatSources.forEach(h=>{
-let d=distance({r,c},h)
+let d=Math.sqrt((h.r-r)**2+(h.c-c)**2)
 t+=6/(d+1)
 })
 
 coldSources.forEach(cl=>{
-let d=distance({r,c},cl)
+let d=Math.sqrt((cl.r-r)**2+(cl.c-c)**2)
 t-=5/(d+1)
 })
 
@@ -294,96 +314,88 @@ ctx.fillRect(cell.c*size,cell.r*size,size,size)
 })
 })
 
+ctx.fillStyle="cyan"
+
+currentCorridor.forEach(cell=>{
+ctx.fillRect(cell.c*size,cell.r*size,size,size)
+})
+
 updateStats()
 
 }
 
 canvas.addEventListener("click",function(e){
 
-let rect=canvas.getBoundingClientRect()
+let {r,c}=getMouseCell(e)
 
-let c=Math.floor((e.clientX-rect.left)/size)
-let r=Math.floor((e.clientY-rect.top)/size)
+if(grid[r][c]=="restricted") return
 
-if(grid[r][c]=="heat" || grid[r][c]=="cold"){
+currentCorridor.push({r,c})
 
-if(startSource==null){
-
-startSource={r,c}
-
-}else{
-
-createCorridor(startSource,{r,c})
-
-startSource=null
-
-}
-
-}
-
-else{
-
-removeCorridor(r,c)
-
-}
+draw()
 
 })
 
-function createCorridor(a,b){
+canvas.addEventListener("dblclick",function(){
 
-if(corridors.length>=3){
+if(currentCorridor.length<2){
 
-alert("Maximum 3 corridors allowed")
+currentCorridor=[]
+draw()
 return
 
 }
 
-let cells=[]
+if(confirm("Finish this corridor?")){
 
-let dx=b.c-a.c
-let dy=b.r-a.r
-
-let steps=Math.max(Math.abs(dx),Math.abs(dy))
-
-for(let i=0;i<=steps;i++){
-
-let r=Math.round(a.r + dy*i/steps)
-let c=Math.round(a.c + dx*i/steps)
-
-if(grid[r][c]=="restricted"){
-
-alert("Invalid corridor: blocked by restricted area")
-return
+corridors.push([...currentCorridor])
 
 }
 
-cells.push({r,c})
+currentCorridor=[]
 
-}
-
-corridors.push(cells)
+updateLayers()
 
 draw()
 
+})
+
+function updateLayers(){
+
+let panel=document.getElementById("layers")
+
+panel.innerHTML=""
+
+corridors.forEach((c,i)=>{
+
+let div=document.createElement("div")
+div.className="layer"
+
+div.innerHTML="Corridor "+(i+1)+
+" <button onclick='deleteCorridor("+i+")'>Delete</button>"
+
+panel.appendChild(div)
+
+})
+
 }
 
-function removeCorridor(r,c){
-
-for(let i=0;i<corridors.length;i++){
-
-for(let cell of corridors[i]){
-
-if(cell.r==r && cell.c==c){
+function deleteCorridor(i){
 
 corridors.splice(i,1)
+
+updateLayers()
+
 draw()
-return
 
 }
 
-}
+function resetCorridors(){
 
-}
+corridors=[]
+currentCorridor=[]
+updateLayers()
+draw()
 
 }
 
@@ -402,13 +414,13 @@ let cost=totalCells*12
 
 document.getElementById("stats").innerText=
 
-"Existing LST: "+existingLST.toFixed(2)+"°C\n"+
-"New LST: "+newLST.toFixed(2)+"°C\n"+
-"LST Reduction: "+(existingLST-newLST).toFixed(2)+"°C\n\n"+
+"Existing LST: "+existingLST.toFixed(2)+"\n"+
+"New LST: "+newLST.toFixed(2)+"\n"+
+"LST Reduction: "+(existingLST-newLST).toFixed(2)+"\n\n"+
 
-"Existing UHI: "+existingUHI.toFixed(2)+"°C\n"+
-"New UHI: "+newUHI.toFixed(2)+"°C\n"+
-"UHI Reduction: "+(existingUHI-newUHI).toFixed(2)+"°C\n\n"+
+"Existing UHI: "+existingUHI.toFixed(2)+"\n"+
+"New UHI: "+newUHI.toFixed(2)+"\n"+
+"UHI Reduction: "+(existingUHI-newUHI).toFixed(2)+"\n\n"+
 
 "Cost: "+cost
 
@@ -434,14 +446,14 @@ let ch=levels[level-1]
 
 if(cost>ch.budget){
 
-alert("Plan rejected: budget exceeded")
+alert("Budget exceeded")
 return
 
 }
 
 if(lstReduction<ch.lstReduction || uhiReduction<ch.uhiReduction){
 
-alert("Plan insufficient: cooling impact too low")
+alert("Cooling impact insufficient")
 return
 
 }
