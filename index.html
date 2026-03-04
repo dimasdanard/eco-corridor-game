@@ -26,7 +26,7 @@ cursor:pointer;
 .sidepanel{
 margin-left:25px;
 text-align:left;
-width:250px;
+width:260px;
 }
 
 .box{
@@ -47,6 +47,13 @@ padding:5px;
 margin-top:5px;
 }
 
+.guide{
+background:#2b2b2b;
+padding:8px;
+margin-top:10px;
+font-size:13px;
+}
+
 </style>
 </head>
 
@@ -56,7 +63,7 @@ margin-top:5px;
 
 <div class="container">
 
-<canvas id="map"></canvas>
+<canvas id="map" width="500" height="500"></canvas>
 
 <div class="sidepanel">
 
@@ -82,6 +89,38 @@ margin-top:5px;
 <p id="challenge"></p>
 <p id="stats"></p>
 
+<div class="guide">
+
+<b>Guide</b>
+
+<br><br>
+
+<b>Create Corridor</b><br>
+Click cells to draw a corridor path.<br>
+Double-click to finish the corridor.
+
+<br><br>
+
+<b>Delete Corridor</b><br>
+Use the Delete button in the corridor layer list.
+
+<br><br>
+
+<b>Reset</b><br>
+Remove all corridors and start planning again.
+
+<br><br>
+
+<b>Next Level</b><br>
+Press <b>PLAN</b> to evaluate your design.<br>
+You must meet the target:
+
+• Minimum LST reduction  
+• Minimum UHI reduction  
+• Stay within the budget
+
+</div>
+
 </div>
 
 </div>
@@ -95,9 +134,6 @@ const baseTemp=28
 
 const canvas=document.getElementById("map")
 const ctx=canvas.getContext("2d")
-
-canvas.width=cols*size
-canvas.height=rows*size
 
 let grid=[]
 let heatSources=[]
@@ -122,11 +158,8 @@ function getMouseCell(e){
 
 const rect=canvas.getBoundingClientRect()
 
-const scaleX=canvas.width/rect.width
-const scaleY=canvas.height/rect.height
-
-const x=(e.clientX-rect.left)*scaleX
-const y=(e.clientY-rect.top)*scaleY
+const x=e.clientX-rect.left
+const y=e.clientY-rect.top
 
 const c=Math.floor(x/size)
 const r=Math.floor(y/size)
